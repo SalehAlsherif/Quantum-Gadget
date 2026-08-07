@@ -212,7 +212,9 @@ export function computeReducedDensityMatrix(
 }
 
 /**
- * Expand a composed gate into an array of primitive CircuitGates
+ * Expand a composed gate into an array of primitive CircuitGates.
+ * Respects the user-specified gate.qubit (control/source) and gate.targetQubit (target)
+ * instead of assuming the target is always gate.qubit + 1.
  */
 export function expandCircuitGate(gate: CircuitGate): CircuitGate[] {
   const gateDef = GATE_DEFS[gate.gateId];
@@ -220,10 +222,31 @@ export function expandCircuitGate(gate: CircuitGate): CircuitGate[] {
     return [gate];
   }
 
+  /**
+   * Map an expandableTo offset index to the actual circuit qubit index.
+   *
+   * Convention used in expandableTo:
+   *   offset 0 → the gate's primary (control/source) qubit
+   *   offset 1 → the gate's secondary (target) qubit
+   *   offset > 1 → sequential additional qubits (used by GHZ chain)
+   *
+   * For 2-qubit gates we honour gate.targetQubit so non-adjacent placements
+   * (e.g. CZ on q0 → q3) expand correctly.
+   * For higher-order gates (GHZ, numQubits > 2) we fall back to gate.qubit + offset
+   * to preserve the sequential cascade structure.
+   */
+  const resolveQubit = (offset: number): number => {
+    if (gateDef.numQubits === 2) {
+      if (offset === 0) return gate.qubit;
+      if (offset === 1) return gate.targetQubit ?? gate.qubit + 1;
+    }
+    return gate.qubit + offset;
+  };
+
   return gateDef.expandableTo.map((elem, idx) => {
     const isTwoQubit = elem.controlOffset !== undefined;
-    const ctrlQubit = isTwoQubit ? gate.qubit + elem.controlOffset! : gate.qubit + elem.targetOffset;
-    const tgtQubit = isTwoQubit ? gate.qubit + elem.targetOffset : undefined;
+    const ctrlQubit = isTwoQubit ? resolveQubit(elem.controlOffset!) : resolveQubit(elem.targetOffset);
+    const tgtQubit  = isTwoQubit ? resolveQubit(elem.targetOffset)   : undefined;
 
     return {
       id: `${gate.id}_exp_${idx}`,
@@ -235,6 +258,7 @@ export function expandCircuitGate(gate: CircuitGate): CircuitGate[] {
     };
   });
 }
+
 
 /**
  * Simulate circuit step-by-step and return step states for timeline inspection
