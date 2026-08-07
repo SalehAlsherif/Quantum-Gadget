@@ -9,7 +9,7 @@ interface CircuitCanvasProps {
   circuit: Circuit;
   selectedGateId: string | null;
   selectedStep: number;
-  swapPending?: { qubit: number; step: number } | null;
+  twoQubitPending?: { qubit: number; step: number; gateId: string } | null;
   onSelectStep: (step: number) => void;
   onSlotClick: (qubit: number, step: number) => void;
   onGateClick: (gate: CircuitGate) => void;
@@ -22,7 +22,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
   circuit,
   selectedGateId,
   selectedStep,
-  swapPending,
+  twoQubitPending,
   onSelectStep,
   onSlotClick,
   onGateClick,
@@ -106,19 +106,36 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
         });
       }
     } else if (!g.isExpanded && gDef?.isComposed) {
-      // Collapsed multi-qubit macro block (e.g. GHZ, BELL)
-      let minQ = g.qubit;
-      let maxQ = g.targetQubit !== undefined ? g.targetQubit : g.qubit;
+      // CZ and SWAP render as direct symbolic 2-qubit gates (●/Z and ✕/✕)
+      // so they use the same twoQubitConnections + gridMap path as CX.
+      // All other composed macros (GHZ, BELL, etc.) use the coloured block overlay.
+      const isSymbolicTwoQubit = g.gateId === "CZ" || g.gateId === "SWAP";
 
-      collapsedMacroBoxes.push({
-        gate: g,
-        minQubit: minQ,
-        maxQubit: maxQ,
-        step: g.step,
-      });
+      if (isSymbolicTwoQubit && g.targetQubit !== undefined) {
+        gridMap[`${g.qubit}_${g.step}`] = { gate: g, isSubGate: false };
+        gridMap[`${g.targetQubit}_${g.step}`] = { gate: g, isSubGate: false };
+        twoQubitConnections.push({
+          gate: g,
+          step: g.step,
+          ctrlQubit: g.qubit,
+          tgtQubit: g.targetQubit,
+          color: gDef?.color ?? "#06b6d4",
+        });
+      } else {
+        // Collapsed multi-qubit macro block (e.g. GHZ, BELL)
+        let minQ = g.qubit;
+        let maxQ = g.targetQubit !== undefined ? g.targetQubit : g.qubit;
 
-      for (let q = minQ; q <= maxQ; q++) {
-        gridMap[`${q}_${g.step}`] = { gate: g, isSubGate: false };
+        collapsedMacroBoxes.push({
+          gate: g,
+          minQubit: minQ,
+          maxQubit: maxQ,
+          step: g.step,
+        });
+
+        for (let q = minQ; q <= maxQ; q++) {
+          gridMap[`${q}_${g.step}`] = { gate: g, isSubGate: false };
+        }
       }
     } else {
       // Direct elementary single- or two-qubit gate
@@ -179,9 +196,13 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
             pointerEvents="none"
           >
             {twoQubitConnections.map((conn, idx) => {
+              const dir = conn.ctrlQubit < conn.tgtQubit ? 1 : -1;
+              // Shorten line so it doesn't overlap control dot (~9px radius) or target symbol (~18px radius for circles, ~15px for SWAP ✕)
+              const ctrlStop = 9;
+              const tgtStop = conn.gate.gateId === "SWAP" ? 15 : 18;
               const x = leftOffset + (conn.step + 1) * stepWidth + stepWidth / 2;
-              const y1 = topOffset + conn.ctrlQubit * rowHeight + rowHeight / 2;
-              const y2 = topOffset + conn.tgtQubit * rowHeight + rowHeight / 2;
+              const y1 = topOffset + conn.ctrlQubit * rowHeight + rowHeight / 2 + dir * ctrlStop;
+              const y2 = topOffset + conn.tgtQubit * rowHeight + rowHeight / 2 - dir * tgtStop;
 
               return (
                 <Line
@@ -191,8 +212,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
                   x2={x}
                   y2={y2}
                   stroke={conn.color}
-                  strokeWidth={4}
-                  strokeDasharray={conn.gate.gateId === "CZ" ? "6,4" : undefined}
+                  strokeWidth={3}
                 />
               );
             })}
@@ -323,20 +343,24 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
                   const gateDef = gate ? GATE_DEFS[gate.gateId] : null;
 
                   // If cell is covered by a collapsed macro box, render transparent slot
-                  const isCollapsedMacroCell = gate && !gate.isExpanded && gateDef?.isComposed;
+                  // CZ and SWAP are excluded — they render as symbolic gates (●/Z and ✕/✕) even when isComposed
+                  const isSymbolicComposedGate = gate?.gateId === "CZ" || gate?.gateId === "SWAP";
+                  const isCollapsedMacroCell = gate && !gate.isExpanded && gateDef?.isComposed && !isSymbolicComposedGate;
 
                   const numQubitsForGate = gateDef?.numQubits ?? (gate?.targetQubit !== undefined ? 2 : 1);
                   const isControlWire = gate && numQubitsForGate === 2 && gate.qubit === q;
                   const isTargetWire = gate && numQubitsForGate === 2 && gate.targetQubit === q;
                   const isSingleQubit = gate && numQubitsForGate === 1;
 
-                  // SWAP two-click: highlight pending source + valid second-click targets
-                  const isSwapPendingSource = swapPending != null && swapPending.qubit === q && swapPending.step === s;
-                  const isSwapValidTarget =
-                    selectedGateId === "SWAP" &&
-                    swapPending != null &&
-                    swapPending.step === s &&
-                    swapPending.qubit !== q &&
+                  // Two-click pending highlights for CX, CZ, SWAP
+                  const isTwoClickGate = selectedGateId === "SWAP" || selectedGateId === "CX" || selectedGateId === "CZ";
+                  const pendingColor = selectedGateId ? (GATE_DEFS[selectedGateId]?.color ?? "#a855f7") : "#a855f7";
+                  const isControlPendingSource = twoQubitPending != null && twoQubitPending.qubit === q && twoQubitPending.step === s;
+                  const isValidTwoQubitTarget =
+                    isTwoClickGate &&
+                    twoQubitPending != null &&
+                    twoQubitPending.step === s &&
+                    twoQubitPending.qubit !== q &&
                     !gate;
 
                   return (
@@ -345,12 +369,15 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
                       style={[
                         styles.slotCell,
                         isSelectedStep && styles.slotCellStepActive,
-                        isSwapPendingSource && styles.slotCellSwapPending,
-                        isSwapValidTarget && styles.slotCellSwapTarget,
+                        isControlPendingSource && { backgroundColor: `${pendingColor}55`, borderWidth: 2, borderColor: pendingColor, borderRadius: 8 },
+                        isValidTwoQubitTarget && { backgroundColor: `${pendingColor}25`, borderWidth: 1.5, borderColor: `${pendingColor}B0`, borderStyle: "dashed", borderRadius: 8 },
                       ]}
                       onPress={() => {
                         if (gate) {
-                          if (gateDef?.isComposed && !entry?.isSubGate) {
+                          // CZ and SWAP: tap on the symbolic representation opens gate info
+                          // (expansion is triggered via the Expand badge, not the whole slot)
+                          const isSymbolicComposed = (gate.gateId === "CZ" || gate.gateId === "SWAP") && !entry?.isSubGate;
+                          if (gateDef?.isComposed && !entry?.isSubGate && !isSymbolicComposed) {
                             onToggleExpand(gate.id);
                           } else {
                             onGateClick(gate);
@@ -392,9 +419,10 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
                             );
                           })()}
 
-                          {/* 2. Control Dot ● (source qubit for CX, CZ, SWAP) */}
+                          {/* 2. Control Dot ● (source qubit for CX, CZ) or ✕ (SWAP source) */}
                           {isControlWire && (() => {
                             const isSWAP = gate.gateId === "SWAP";
+                            const isComposedSymbolic = (gate.gateId === "CZ" || gate.gateId === "SWAP") && !entry?.isSubGate;
                             return (
                               <View style={{ position: "relative", alignItems: "center", justifyContent: "center" }}>
                                 {isSWAP ? (
@@ -405,6 +433,15 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
                                 ) : (
                                   // CX / CZ source: solid filled dot ●
                                   <View style={[styles.controlMereDot, { backgroundColor: gateDef?.color ?? "#06b6d4" }]} />
+                                )}
+                                {/* Expand badge for CZ / SWAP (tap to decompose) */}
+                                {isComposedSymbolic && (
+                                  <TouchableOpacity
+                                    style={styles.expandBadgeOnSymbolicGate}
+                                    onPress={(e) => { e.stopPropagation(); onToggleExpand(gate.id); }}
+                                  >
+                                    <Maximize2 size={8} color="#ffffff" />
+                                  </TouchableOpacity>
                                 )}
                                 {!entry?.isSubGate && (
                                   <TouchableOpacity
@@ -815,6 +852,16 @@ const styles = StyleSheet.create({
   swapCrossText: {
     fontSize: 16,
     fontWeight: "900",
+  },
+  // Expand badge on the control node of symbolic composed gates (CZ, SWAP)
+  expandBadgeOnSymbolicGate: {
+    position: "absolute",
+    top: -10,
+    left: -10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 5,
+    padding: 2,
+    zIndex: 20,
   },
   // SWAP two-click pending highlight: source slot (first click)
   slotCellSwapPending: {

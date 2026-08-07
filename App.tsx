@@ -14,8 +14,8 @@ export default function App() {
   const [selectedGateId, setSelectedGateId] = useState<string | null>("H");
   const [selectedStep, setSelectedStep] = useState<number>(-1);
   const [modalMode, setModalMode] = useState<"presets" | "qasm" | null>(null);
-  // SWAP two-click state: pending means first qubit + step already chosen
-  const [swapPending, setSwapPending] = useState<{ qubit: number; step: number } | null>(null);
+  // Two-click placement state for CX, CZ, SWAP — first click = control/source, second click = target
+  const [twoQubitPending, setTwoQubitPending] = useState<{ qubit: number; step: number; gateId: string } | null>(null);
 
   // Default Circuit: Bell Pair + Hadamard
   const [circuit, setCircuit] = useState<Circuit>({
@@ -55,51 +55,56 @@ export default function App() {
     const gDef = GATE_DEFS[selectedGateId];
     if (!gDef) return;
 
-    // --- SWAP: two-click placement for non-adjacent qubits ---
-    if (selectedGateId === "SWAP") {
-      if (swapPending === null) {
-        // First click: record source qubit & step
-        setSwapPending({ qubit, step });
+    // --- Two-click placement for CX, CZ and SWAP ---
+    const isTwoClickGate = selectedGateId === "SWAP" || selectedGateId === "CX" || selectedGateId === "CZ";
+    if (isTwoClickGate) {
+      if (twoQubitPending === null) {
+        // First click: record control/source qubit & step
+        setTwoQubitPending({ qubit, step, gateId: selectedGateId });
         return;
       } else {
-        // Second click: finalize SWAP between swapPending and current slot
-        const srcQ = swapPending.qubit;
+        // Second click: finalize gate between twoQubitPending and current slot
+        const srcQ = twoQubitPending.qubit;
         const tgtQ = qubit;
-        const srcStep = swapPending.step;
+        const srcStep = twoQubitPending.step;
+        // Must be same time step, different qubit
         if (srcQ !== tgtQ && srcStep === step) {
-          const ctrl = Math.min(srcQ, tgtQ);
-          const tgt = Math.max(srcQ, tgtQ);
+          // SWAP is symmetric — store lower as qubit; CX/CZ preserve click order (ctrl then target)
+          const isSWAP = selectedGateId === "SWAP";
+          const ctrlQ = isSWAP ? Math.min(srcQ, tgtQ) : srcQ;
+          const tgtQFinal = isSWAP ? Math.max(srcQ, tgtQ) : tgtQ;
+
           const newGate: CircuitGate = {
             id: `gate_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            gateId: "SWAP",
-            qubit: ctrl,
-            targetQubit: tgt,
+            gateId: selectedGateId,
+            qubit: ctrlQ,
+            targetQubit: tgtQFinal,
             step,
             isExpanded: false,
           };
+
+          // Remove any existing gates occupying either qubit wire at this step
           const filteredGates = circuit.gates.filter(
-            (g) => !((g.qubit === ctrl || g.qubit === tgt) && g.step === step)
+            (g) => !(g.step === step && (
+              g.qubit === ctrlQ || g.qubit === tgtQFinal ||
+              g.targetQubit === ctrlQ || g.targetQubit === tgtQFinal
+            ))
           );
           setCircuit((prev) => ({ ...prev, gates: [...filteredGates, newGate] }));
           setSelectedStep(step);
         }
-        setSwapPending(null);
+        setTwoQubitPending(null);
         return;
       }
     }
 
-    // Cancel any pending SWAP when placing a different gate
-    if (swapPending !== null) setSwapPending(null);
+    // Cancel any pending two-qubit op when a different gate is placed
+    if (twoQubitPending !== null) setTwoQubitPending(null);
 
     let startQubit = qubit;
     let targetQubit: number | undefined = undefined;
 
-    if (gDef.numQubits === 2) {
-      if (startQubit + 1 >= numQubits) {
-        startQubit = Math.max(0, numQubits - 2);
-      }
-      targetQubit = startQubit + 1;
-    } else if (gDef.numQubits > 2) {
+    if (gDef.numQubits > 2) {
       startQubit = 0;
       targetQubit = Math.min(numQubits - 1, gDef.numQubits - 1);
     }
@@ -123,7 +128,7 @@ export default function App() {
 
     // Auto update selected step for real-time inspection
     setSelectedStep(step);
-  }, [selectedGateId, swapPending, circuit, numQubits]);
+  }, [selectedGateId, twoQubitPending, circuit, numQubits]);
 
   // Toggle composed gate expansion
   const handleToggleExpand = (gateId: string) => {
@@ -177,6 +182,7 @@ export default function App() {
         <GatePalette
           selectedGateId={selectedGateId}
           onSelectGate={(id) => setSelectedGateId(id)}
+          twoQubitPending={twoQubitPending}
         />
 
         {/* Center Drag & Drop Circuit Timeline Canvas */}
@@ -185,7 +191,7 @@ export default function App() {
             circuit={circuit}
             selectedGateId={selectedGateId}
             selectedStep={selectedStep}
-            swapPending={swapPending}
+            twoQubitPending={twoQubitPending}
             onSelectStep={(s) => setSelectedStep(s)}
             onSlotClick={handleSlotClick}
             onGateClick={(g) => setSelectedStep(g.step)}
