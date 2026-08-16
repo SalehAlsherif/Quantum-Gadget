@@ -35,54 +35,56 @@ export const StateInspector: React.FC<StateInspectorProps> = ({
           </Text>
         </View>
 
-        <View style={styles.tabButtonsGroup}>
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === "statevector" && styles.tabBtnActive]}
-            onPress={() => setActiveTab("statevector")}
-          >
-            <Eye size={14} color={activeTab === "statevector" ? "#38bdf8" : "#94a3b8"} />
-            <Text style={[styles.tabBtnText, activeTab === "statevector" && styles.tabBtnTextActive]}>
-              Statevector |ψ⟩
-            </Text>
-          </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.tabButtonsGroup}>
+            <TouchableOpacity
+              style={[styles.tabBtn, activeTab === "statevector" && styles.tabBtnActive]}
+              onPress={() => setActiveTab("statevector")}
+            >
+              <Eye size={14} color={activeTab === "statevector" ? "#38bdf8" : "#94a3b8"} />
+              <Text style={[styles.tabBtnText, activeTab === "statevector" && styles.tabBtnTextActive]}>
+                Statevector |ψ⟩
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === "density" && styles.tabBtnActive]}
-            onPress={() => setActiveTab("density")}
-          >
-            <Grid size={14} color={activeTab === "density" ? "#38bdf8" : "#94a3b8"} />
-            <Text style={[styles.tabBtnText, activeTab === "density" && styles.tabBtnTextActive]}>
-              Density Matrix ρ
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabBtn, activeTab === "density" && styles.tabBtnActive]}
+              onPress={() => setActiveTab("density")}
+            >
+              <Grid size={14} color={activeTab === "density" ? "#38bdf8" : "#94a3b8"} />
+              <Text style={[styles.tabBtnText, activeTab === "density" && styles.tabBtnTextActive]}>
+                Density Matrix ρ
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === "bloch" && styles.tabBtnActive]}
-            onPress={() => setActiveTab("bloch")}
-          >
-            <Globe size={14} color={activeTab === "bloch" ? "#38bdf8" : "#94a3b8"} />
-            <Text style={[styles.tabBtnText, activeTab === "bloch" && styles.tabBtnTextActive]}>
-              Bloch Spheres
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabBtn, activeTab === "bloch" && styles.tabBtnActive]}
+              onPress={() => setActiveTab("bloch")}
+            >
+              <Globe size={14} color={activeTab === "bloch" ? "#38bdf8" : "#94a3b8"} />
+              <Text style={[styles.tabBtnText, activeTab === "bloch" && styles.tabBtnTextActive]}>
+                Bloch Spheres
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === "math" && styles.tabBtnActive]}
-            onPress={() => setActiveTab("math")}
-          >
-            <BookOpen size={14} color={activeTab === "math" ? "#38bdf8" : "#94a3b8"} />
-            <Text style={[styles.tabBtnText, activeTab === "math" && styles.tabBtnTextActive]}>
-              Nielsen & Chuang Math
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.tabBtn, activeTab === "math" && styles.tabBtnActive]}
+              onPress={() => setActiveTab("math")}
+            >
+              <BookOpen size={14} color={activeTab === "math" ? "#38bdf8" : "#94a3b8"} />
+              <Text style={[styles.tabBtnText, activeTab === "math" && styles.tabBtnTextActive]}>
+                Nielsen & Chuang Math
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
 
       {/* Tab Contents */}
       <View style={styles.tabContentArea}>
         {/* --- TAB 1: STATE VECTOR --- */}
         {activeTab === "statevector" && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScrollContent}>
             <View style={styles.stateVectorGrid}>
               {Array.from({ length: numStates }, (_, i) => {
                 const coeff = stepState.stateVector[i];
@@ -148,7 +150,7 @@ export const StateInspector: React.FC<StateInspectorProps> = ({
               </View>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScrollContent}>
               <View style={styles.matrixHeatmapTable}>
                 {stepState.densityMatrix.slice(0, numStates).map((row, r) => (
                   <View key={r} style={styles.heatmapRow}>
@@ -178,7 +180,7 @@ export const StateInspector: React.FC<StateInspectorProps> = ({
 
         {/* --- TAB 3: BLOCH SPHERES --- */}
         {activeTab === "bloch" && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScrollContent}>
             <View style={styles.blochRow}>
               {stepState.reducedStates.map((red) => {
                 // Render 2D projected Bloch Sphere with vector rx, ry, rz
@@ -273,18 +275,15 @@ export const StateInspector: React.FC<StateInspectorProps> = ({
 
 const styles = StyleSheet.create({
   inspectorContainer: {
-    height: 240,
+    flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.95)",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(56, 189, 248, 0.25)",
     flexDirection: "column",
   },
   tabHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     backgroundColor: "rgba(30, 41, 59, 0.7)",
     borderBottomWidth: 1,
     borderBottomColor: "rgba(148, 163, 184, 0.15)",
@@ -338,6 +337,9 @@ const styles = StyleSheet.create({
   tabContentArea: {
     flex: 1,
     padding: 10,
+  },
+  hScrollContent: {
+    alignItems: "flex-start",
   },
   stateVectorGrid: {
     flexDirection: "row",

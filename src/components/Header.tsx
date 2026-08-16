@@ -26,9 +26,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Brand Title */}
       <View style={styles.brandGroup}>
         <View style={styles.iconGlow}>
-          <Atom color="#38bdf8" size={24} />
+          <Atom color="#38bdf8" size={22} />
         </View>
-        <View>
+        <View style={styles.brandTextBlock}>
           <Text style={styles.titleText}>Quantum Gadget</Text>
           <Text style={styles.subtitleText}>Nielsen & Chuang Engine • 4 Qubit Simulator</Text>
         </View>
@@ -78,11 +78,10 @@ export const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    gap: 10,
     backgroundColor: "rgba(15, 23, 42, 0.85)",
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(56, 189, 248, 0.2)",
@@ -102,6 +101,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(56, 189, 248, 0.4)",
   },
+  brandTextBlock: {
+    flexShrink: 1,
+  },
   titleText: {
     color: "#f8fafc",
     fontSize: 18,
@@ -117,6 +119,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    alignSelf: "flex-start",
     backgroundColor: "rgba(30, 41, 59, 0.7)",
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -149,6 +152,7 @@ const styles = StyleSheet.create({
   },
   actionsGroup: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
   },

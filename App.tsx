@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { View, StyleSheet, SafeAreaView, StatusBar, Text } from "react-native";
+import { View, StyleSheet, SafeAreaView, StatusBar, Text, TouchableOpacity } from "react-native";
 import { Header } from "./src/components/Header";
 import { GatePalette } from "./src/components/GatePalette";
 import { CircuitCanvas } from "./src/components/CircuitCanvas";
@@ -8,12 +8,16 @@ import { PresetsModal } from "./src/components/PresetsModal";
 import { Circuit, CircuitGate, simulateCircuit } from "./src/engine/quantumState";
 import { GATE_DEFS } from "./src/engine/quantumGates";
 import { toggleGateExpansion, deleteGateFromCircuit } from "./src/engine/decompositions";
+import { Sliders, LayoutGrid, Eye } from "lucide-react-native";
+
+type ActiveView = "gates" | "circuit" | "inspector";
 
 export default function App() {
   const [numQubits, setNumQubits] = useState(4);
   const [selectedGateId, setSelectedGateId] = useState<string | null>("H");
   const [selectedStep, setSelectedStep] = useState<number>(-1);
   const [modalMode, setModalMode] = useState<"presets" | "qasm" | null>(null);
+  const [activeView, setActiveView] = useState<ActiveView>("circuit");
   // Two-click placement state for CX, CZ, SWAP — first click = control/source, second click = target
   const [twoQubitPending, setTwoQubitPending] = useState<{ qubit: number; step: number; gateId: string } | null>(null);
 
@@ -161,6 +165,26 @@ export default function App() {
     setSelectedStep(newCircuit.gates.length > 0 ? 0 : -1);
   };
 
+  // Selecting a gate jumps straight to the Circuit tab so placing it is a single next tap.
+  const handleSelectGate = useCallback((id: string) => {
+    setSelectedGateId(id);
+    setActiveView("circuit");
+  }, []);
+
+  const selectedGateDef = selectedGateId ? GATE_DEFS[selectedGateId] : null;
+  const isTwoClickGate = selectedGateId === "CX" || selectedGateId === "CZ" || selectedGateId === "SWAP";
+
+  let statusText = "Pick a gate from the Gates tab to begin building your circuit.";
+  if (selectedGateDef) {
+    if (isTwoClickGate) {
+      statusText = twoQubitPending
+        ? `${selectedGateDef.name} — Step 2/2: tap the target qubit in the same column`
+        : `${selectedGateDef.name} — Step 1/2: tap the control qubit wire on the Circuit tab`;
+    } else {
+      statusText = `${selectedGateDef.name} selected — tap a wire slot on the Circuit tab to place it`;
+    }
+  }
+
   return (
     <SafeAreaView style={styles.appContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
@@ -176,17 +200,31 @@ export default function App() {
         selectedStep={selectedStep}
       />
 
-      {/* Main Workspace Layout */}
-      <View style={styles.workspaceBody}>
-        {/* Left Gate Palette */}
-        <GatePalette
-          selectedGateId={selectedGateId}
-          onSelectGate={(id) => setSelectedGateId(id)}
-          twoQubitPending={twoQubitPending}
-        />
+      {/* Persistent selection status — always visible so the two-click gate flow stays legible across tabs */}
+      <TouchableOpacity
+        style={styles.statusBar}
+        activeOpacity={selectedGateDef ? 0.7 : 1}
+        disabled={!selectedGateDef}
+        onPress={() => setActiveView("circuit")}
+      >
+        {selectedGateDef && (
+          <View style={[styles.statusGateBadge, { backgroundColor: selectedGateDef.color }]}>
+            <Text style={styles.statusGateBadgeText}>{selectedGateDef.symbol}</Text>
+          </View>
+        )}
+        <Text style={styles.statusText} numberOfLines={1}>{statusText}</Text>
+      </TouchableOpacity>
 
-        {/* Center Drag & Drop Circuit Timeline Canvas */}
-        <View style={styles.canvasWrapper}>
+      {/* Active View: exactly one of Gates / Circuit / Inspector is shown at a time */}
+      <View style={styles.contentArea}>
+        {activeView === "gates" && (
+          <GatePalette
+            selectedGateId={selectedGateId}
+            onSelectGate={handleSelectGate}
+          />
+        )}
+
+        {activeView === "circuit" && (
           <CircuitCanvas
             circuit={circuit}
             selectedGateId={selectedGateId}
@@ -198,14 +236,42 @@ export default function App() {
             onToggleExpand={handleToggleExpand}
             onDeleteGate={handleDeleteGate}
           />
-        </View>
+        )}
+
+        {activeView === "inspector" && (
+          <StateInspector
+            stepState={inspectedStepState}
+            numQubits={numQubits}
+          />
+        )}
       </View>
 
-      {/* Bottom Quantum State & Density Matrix Inspector */}
-      <StateInspector
-        stepState={inspectedStepState}
-        numQubits={numQubits}
-      />
+      {/* Bottom Tab Navigation */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabBarBtn, activeView === "gates" && styles.tabBarBtnActive]}
+          onPress={() => setActiveView("gates")}
+        >
+          <Sliders size={20} color={activeView === "gates" ? "#38bdf8" : "#94a3b8"} />
+          <Text style={[styles.tabBarLabel, activeView === "gates" && styles.tabBarLabelActive]}>Gates</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabBarBtn, activeView === "circuit" && styles.tabBarBtnActive]}
+          onPress={() => setActiveView("circuit")}
+        >
+          <LayoutGrid size={20} color={activeView === "circuit" ? "#38bdf8" : "#94a3b8"} />
+          <Text style={[styles.tabBarLabel, activeView === "circuit" && styles.tabBarLabelActive]}>Circuit</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabBarBtn, activeView === "inspector" && styles.tabBarBtnActive]}
+          onPress={() => setActiveView("inspector")}
+        >
+          <Eye size={20} color={activeView === "inspector" ? "#38bdf8" : "#94a3b8"} />
+          <Text style={[styles.tabBarLabel, activeView === "inspector" && styles.tabBarLabelActive]}>Inspector</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Presets & QASM Modal */}
       <PresetsModal
@@ -224,11 +290,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#090d16",
   },
-  workspaceBody: {
-    flex: 1,
+  statusBar: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "rgba(56, 189, 248, 0.08)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(56, 189, 248, 0.2)",
   },
-  canvasWrapper: {
+  statusGateBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusGateBadgeText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  statusText: {
     flex: 1,
+    color: "#cbd5e1",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  contentArea: {
+    flex: 1,
+  },
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "rgba(15, 23, 42, 0.95)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(56, 189, 248, 0.2)",
+    paddingBottom: 4,
+  },
+  tabBarBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    paddingVertical: 8,
+    borderTopWidth: 2,
+    borderTopColor: "transparent",
+  },
+  tabBarBtnActive: {
+    borderTopColor: "#38bdf8",
+  },
+  tabBarLabel: {
+    color: "#94a3b8",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  tabBarLabelActive: {
+    color: "#38bdf8",
   },
 });

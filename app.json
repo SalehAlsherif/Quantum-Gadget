@@ -3,7 +3,7 @@
     "name": "Quantum Gadget",
     "slug": "quantum-gadget",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {

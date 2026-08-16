@@ -36,7 +36,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
   const rowHeight = 72; // Vertical wire row spacing
   const stepWidth = 54;  // Step column width
   const leftOffset = 76; // Left margin for qubit labels
-  const topOffset = 6;   // Top margin offset
+  const topOffset = 0;   // Qubit rows start flush at the top of the grid — no extra offset
 
   // Track expanded gate boxes & collapsed macro boxes
   const expandedGateBoxes: {
@@ -153,8 +153,14 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
     }
   });
 
+  // Full circuit width (qubit label column + initial-state slot + every time step),
+  // used to size the horizontal scroll content so every step stays reachable on narrow screens.
+  const contentWidth = leftOffset + (steps.length + 1) * stepWidth;
+
   return (
     <View style={styles.canvasContainer}>
+    <ScrollView horizontal showsHorizontalScrollIndicator style={styles.horizontalScroll}>
+    <View style={{ width: contentWidth }}>
       {/* Time Step Header / Scrubber */}
       <View style={styles.timelineHeaderRow}>
         <View style={styles.qubitLabelCorner}>
@@ -186,7 +192,7 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
       </View>
 
       {/* Circuit Wires Grid */}
-      <ScrollView style={styles.gridScrollView}>
+      <View style={styles.gridScrollView}>
         <View style={{ position: "relative", minHeight: qubits.length * rowHeight + 20 }}>
           {/* SVG Connector Lines Layer for 2-Qubit Direct Gates */}
           <Svg
@@ -508,7 +514,9 @@ export const CircuitCanvas: React.FC<CircuitCanvasProps> = ({
             </View>
           ))}
         </View>
-      </ScrollView>
+      </View>
+    </View>
+    </ScrollView>
     </View>
   );
 };
@@ -518,6 +526,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0b1329",
     flexDirection: "column",
+  },
+  horizontalScroll: {
+    flex: 1,
   },
   timelineHeaderRow: {
     flexDirection: "row",
@@ -562,7 +573,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
   },
   gridScrollView: {
-    flex: 1,
     paddingVertical: 10,
   },
   wireRow: {

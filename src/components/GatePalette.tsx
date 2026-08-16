@@ -6,13 +6,11 @@ import { Layers, Sparkles, Sliders, Info, Split } from "lucide-react-native";
 interface GatePaletteProps {
   selectedGateId: string | null;
   onSelectGate: (gateId: string) => void;
-  twoQubitPending?: { qubit: number; step: number; gateId: string } | null;
 }
 
 export const GatePalette: React.FC<GatePaletteProps> = ({
   selectedGateId,
   onSelectGate,
-  twoQubitPending,
 }) => {
   const [activeCategory, setActiveCategory] = useState<GateCategory | "all">("all");
   const [hoveredGate, setHoveredGate] = useState<GateDef | null>(null);
@@ -104,29 +102,14 @@ export const GatePalette: React.FC<GatePaletteProps> = ({
           );
         })}
       </ScrollView>
-      {/* Two-click placement hint for CX, CZ, SWAP */}
-      {(selectedGateId === "CX" || selectedGateId === "CZ" || selectedGateId === "SWAP") && (
-        <View style={[styles.placementHint, twoQubitPending ? styles.placementHintStep2 : styles.placementHintStep1]}>
-          <Text style={styles.placementHintStep}>
-            {twoQubitPending ? "Step 2 / 2" : "Step 1 / 2"}
-          </Text>
-          <Text style={styles.placementHintText}>
-            {twoQubitPending
-              ? `Now click the target qubit on the same column`
-              : `Click the control qubit wire on the circuit`}
-          </Text>
-        </View>
-      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   paletteContainer: {
+    flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.95)",
-    borderRightWidth: 1,
-    borderRightColor: "rgba(56, 189, 248, 0.2)",
-    width: 270,
     flexDirection: "column",
   },
   tabsScrollView: {
@@ -236,35 +219,5 @@ const styles = StyleSheet.create({
     color: "#cbd5e1",
     fontSize: 10,
     fontWeight: "700",
-  },
-  placementHint: {
-    marginHorizontal: 8,
-    marginBottom: 8,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 1,
-  },
-  placementHintStep1: {
-    backgroundColor: "rgba(56, 189, 248, 0.1)",
-    borderColor: "rgba(56, 189, 248, 0.35)",
-  },
-  placementHintStep2: {
-    backgroundColor: "rgba(34, 197, 94, 0.12)",
-    borderColor: "rgba(34, 197, 94, 0.4)",
-  },
-  placementHintStep: {
-    color: "#38bdf8",
-    fontSize: 9,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  placementHintText: {
-    color: "#cbd5e1",
-    fontSize: 10,
-    fontWeight: "600",
-    lineHeight: 14,
   },
 });
